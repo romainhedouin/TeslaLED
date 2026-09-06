@@ -5,23 +5,27 @@ project's purpose and architecture first.
 
 ## Scope of this repo
 
-Both halves now live here: the Android client (`app/`) and the Pi-side
-receiver (`pi/`, pulled from a live Pi on 2026-09-06 — see `pi/README.md`).
-They deploy completely separately (one's an APK, the other's copied by hand
-onto the Pi's home directory and run via systemd) and nothing in the build
-connects them; keep that in mind when editing one side and assuming the other
-picks up the change automatically. It doesn't — a protocol change requires
-manually redeploying `pi/bt_server.py` to the actual Pi.
+This repo has the Android client only (`app/`). The Pi-side receiver used to
+be duplicated here under `pi/`, but that was a stale fork of what's now
+maintained at
+[romainhedouin/tesla-panel](https://github.com/romainhedouin/tesla-panel)
+(`tesla/` directory there) — it's been removed from here to avoid two copies
+silently drifting apart. Treat `tesla-panel`'s `tesla/` as authoritative for
+anything Pi-side; this repo and that one deploy completely separately
+(one's an APK, the other's copied by hand onto the Pi's home directory and
+run via systemd) and nothing in the build connects them — a protocol change
+requires manually redeploying `bt_server.py` to the actual Pi regardless of
+which repo you edited it in.
 
-## The wire protocol (see `pi/bt_server.py` for the authoritative receiver side)
+## The wire protocol (see tesla-panel's `tesla/bt_server.py` for the authoritative receiver side)
 
 Each interaction is: send a command-type marker string, then a payload, then a
 literal `DONE`. `bt_server.py`'s `receive_data()` sends `"ack"` after every
 chunk and `"OK"` once it sees `DONE` — that's the response `BluetoothClient`
 reads and discards after each write. If you change chunk size, framing, or add
-a new command type on the Android side, `bt_server.py` must change to match,
-and the updated file has to actually be redeployed to the Pi (see
-`pi/README.md` — nothing automates that).
+a new command type on the Android side, `bt_server.py` (in `tesla-panel`) must
+change to match, and the updated file has to actually be redeployed to the
+Pi — nothing automates that.
 
 ## Things that will bite you
 
@@ -55,8 +59,14 @@ and the updated file has to actually be redeployed to the Pi (see
   the manifest entry covers it.
 - Pairing a new phone with the Pi will silently fail (no error anywhere, not
   even in `bluetoothctl paired-devices`) unless the Pi has a pairing agent
-  running — see `pi/README.md`. This has nothing to do with the Android code;
-  don't go looking for a client-side cause if pairing itself won't complete.
+  running — see `tesla-panel`'s `tesla/README.md`. This has nothing to do
+  with the Android code; don't go looking for a client-side cause if pairing
+  itself won't complete.
+- A panel showing colored static/noise instead of the actual image is a
+  Pi-side GPIO-timing or wiring issue, not an Android-side bug — see
+  `tesla-panel`'s `tesla/README.md` troubleshooting section. Confirmed by
+  reproducing it with the LED matrix library's own test patterns, no
+  Bluetooth/Android involved at all.
 
 ## Conventions actually in use (not necessarily best practice, but consistent)
 

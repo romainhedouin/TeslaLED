@@ -1,9 +1,15 @@
 # TeslaLED
 
 An Android app that remote-controls an LED message panel mounted on a car, over
-Bluetooth. The panel itself is driven by a Raspberry Pi (3B/3B+) running the
-receiver in `pi/` (see `pi/README.md` for deployment and a documented gotcha
-around Bluetooth pairing on a headless Pi).
+Bluetooth. The panel itself is driven by a Raspberry Pi (3B/3B+).
+
+> **Note:** this app is also maintained as `android/` inside
+> [romainhedouin/tesla-panel](https://github.com/romainhedouin/tesla-panel)
+> (a fork of `hzeller/rpi-rgb-led-matrix`), alongside the Pi-side receiver in
+> that repo's `tesla/` directory — see `tesla/README.md` there for
+> deployment and a documented gotcha around Bluetooth pairing on a headless
+> Pi. This standalone repo may drift from that copy; treat `tesla-panel` as
+> the actively-maintained one if the two disagree.
 
 ## How it works
 
@@ -28,8 +34,9 @@ around Bluetooth pairing on a headless Pi).
   Platform 32 installed.
 - minSdk 23, targetSdk/compileSdk 32.
 - A phone with Bluetooth, paired with the Pi ahead of time (pairing happens
-  outside the app, at the OS level — see `pi/README.md` if pairing silently
-  fails, since a headless Pi needs a pairing agent running to accept it).
+  outside the app, at the OS level — see `tesla-panel`'s `tesla/README.md` if
+  pairing silently fails, since a headless Pi needs a pairing agent running
+  to accept it).
 
 ## Building
 
