@@ -1,8 +1,9 @@
 # TeslaLED
 
 An Android app that remote-controls an LED message panel mounted on a car, over
-Bluetooth. The panel itself is driven by a Raspberry Pi (3B/3B+) — this repo
-only contains the Android client, not the Pi-side receiver.
+Bluetooth. The panel itself is driven by a Raspberry Pi (3B/3B+) running the
+receiver in `pi/` (see `pi/README.md` for deployment and a documented gotcha
+around Bluetooth pairing on a headless Pi).
 
 ## How it works
 
@@ -27,7 +28,8 @@ only contains the Android client, not the Pi-side receiver.
   Platform 32 installed.
 - minSdk 23, targetSdk/compileSdk 32.
 - A phone with Bluetooth, paired with the Pi ahead of time (pairing happens
-  outside the app, at the OS level).
+  outside the app, at the OS level — see `pi/README.md` if pairing silently
+  fails, since a headless Pi needs a pairing agent running to accept it).
 
 ## Building
 
@@ -45,5 +47,11 @@ phone directly (`adb install`, AirDrop, etc.) — it isn't published anywhere.
 - No error surfacing beyond `System.out.println` — failures show up as a red
   button flash and a generic toast, not a real message.
 - `BluetoothClient` extends `android.content.Context` and stubs out every
-  abstract method just to reuse `checkSelfPermission()`. It isn't a real
-  Context; don't rely on the stubbed methods returning anything but `null`/`0`.
+  abstract method except a real `Context` it now holds (`realContext`), used
+  for permission checks. It still isn't a real Context; don't rely on the
+  stubbed methods returning anything but `null`/`0`.
+- On Android 12+ (targetSdk 31+), `BLUETOOTH_CONNECT` is a runtime permission.
+  `MainActivity` requests it on launch and re-checks before every command; if
+  you see the app silently no-op on button taps (a toast, no crash), the
+  permission was denied — check phone Settings → Apps → TeslaLED →
+  Permissions.

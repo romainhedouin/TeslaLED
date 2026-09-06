@@ -1,5 +1,7 @@
 package com.teslaowls.teslaled;
 
+import android.Manifest;
+import android.content.pm.PackageManager;
 import android.graphics.drawable.Drawable;
 import android.os.Bundle;
 import android.view.View;
@@ -9,12 +11,14 @@ import android.widget.GridLayout;
 import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.app.ActivityCompat;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
 
 
 public class MainActivity extends AppCompatActivity {
+    private static final int REQUEST_BLUETOOTH_CONNECT = 1;
     // A dictionary with the features and their corresponding commands, in this order
     private static final Map<String, PanelCommand> featuresToCommands = new LinkedHashMap<String, PanelCommand>() {{
         put("Bonjour", new ImageCommand("bonjour.ppm", 3000));
@@ -32,13 +36,17 @@ public class MainActivity extends AppCompatActivity {
         //put("Carre", new LegacyCommand("carre", 5000));
     }};
 
-    BluetoothClient bluetoothClient = new BluetoothClient();
+    BluetoothClient bluetoothClient = new BluetoothClient(this);
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+
+        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.BLUETOOTH_CONNECT}, REQUEST_BLUETOOTH_CONNECT);
+        }
 
         GridLayout gridLayout = findViewById(R.id.command_grid);
         for (final String feature : featuresToCommands.keySet()) {
@@ -93,6 +101,10 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private boolean initiateCommand(PanelCommand command) {
+        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
+            Toast.makeText(this, "Bluetooth permission not granted.", Toast.LENGTH_SHORT).show();
+            return false;
+        }
         bluetoothClient.findDevice();
         if (!bluetoothClient.isConnected()) {
             bluetoothClient.connect();

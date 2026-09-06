@@ -47,9 +47,10 @@ public class BluetoothClient extends Context {
 
     private BluetoothDevice device = null;
     private BluetoothSocket socket = null;
+    private final Context realContext;
 
-    public BluetoothClient() {
-
+    public BluetoothClient(Context realContext) {
+        this.realContext = realContext;
     }
 
     public void findDevice() {
@@ -72,7 +73,7 @@ public class BluetoothClient extends Context {
 
     public void createSocket() {
         try {
-            if (ActivityCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
+            if (ActivityCompat.checkSelfPermission(this.realContext, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
                 return;
             }
             this.socket = this.device.createRfcommSocketToServiceRecord(UUID.fromString("00001101-0000-1000-8000-00805F9B34FB"));
@@ -84,7 +85,7 @@ public class BluetoothClient extends Context {
 
     public void connect() {
         try {
-            if (ActivityCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
+            if (ActivityCompat.checkSelfPermission(this.realContext, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
                 return;
             }
             this.createSocket();
