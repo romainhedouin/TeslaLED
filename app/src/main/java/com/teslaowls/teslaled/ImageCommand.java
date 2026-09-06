@@ -25,24 +25,18 @@ public class ImageCommand extends PanelCommand {
 
     @Override
     public boolean sendCommand(BluetoothClient bluetoothClient, AssetManager assetManager) {
-        if (bluetoothClient.sendMessage("image_command".getBytes())) {
-            System.out.println("[+] Able to send image command.");
-            try {
-                InputStream inputStream = assetManager.open(this.imageFile);
-                int size = inputStream.available();
-                byte[] buffer = new byte[size];
-                int lengthRead = inputStream.read(buffer);
+        try {
+            InputStream inputStream = assetManager.open(this.imageFile);
+            int size = inputStream.available();
+            byte[] buffer = new byte[size];
+            inputStream.read(buffer);
+            inputStream.close();
 
-                bluetoothClient.sendMessage(buffer);
-                inputStream.close();
-                return true;
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-        } else {
-            System.out.println("[-] Couldn't use image command.");
+            return bluetoothClient.sendCommand(BluetoothClient.COMMAND_IMAGE, buffer);
+        } catch (IOException e) {
+            System.out.println("[-] Couldn't read image asset.");
+            e.printStackTrace();
             return false;
         }
-        return false;
     }
 }

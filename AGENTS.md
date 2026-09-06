@@ -19,13 +19,29 @@ which repo you edited it in.
 
 ## The wire protocol (see tesla-panel's `tesla/bt_server.py` for the authoritative receiver side)
 
-Each interaction is: send a command-type marker string, then a payload, then a
-literal `DONE`. `bt_server.py`'s `receive_data()` sends `"ack"` after every
-chunk and `"OK"` once it sees `DONE` — that's the response `BluetoothClient`
-reads and discards after each write. If you change chunk size, framing, or add
-a new command type on the Android side, `bt_server.py` (in `tesla-panel`) must
-change to match, and the updated file has to actually be redeployed to the
-Pi — nothing automates that.
+`[1 byte command type][4 bytes big-endian payload length][payload]`, then a
+single-byte status response (`0` = OK, anything else = error).
+`BluetoothClient.sendCommand()` builds and writes that header + payload in
+one shot; `bt_server.py`'s `handle_one_command()` reads exactly
+`HEADER_SIZE` bytes then exactly `length` more via a `recv_exact()` loop, and
+dispatches on the command type (`COMMAND_IMAGE` / `COMMAND_LEGACY` /
+`COMMAND_KILL`, defined identically on both sides — keep the constants in
+sync if you ever add one).
+
+This replaced an earlier ad-hoc scheme (chunk the payload, send an `"ack"`
+after each chunk, terminate with a literal `"DONE"` marker) that was fragile
+by construction: RFCOMM is a reliable ordered byte stream with no built-in
+message boundaries, so nothing guaranteed a `recv()` call would ever return
+exactly the sentinel bytes `b"DONE"` and nothing else — a coalesced or split
+read could silently corrupt a transfer. The length prefix removes the need
+for a sentinel entirely, and per-chunk acks were never actually
+necessary — RFCOMM already guarantees reliable delivery, so they only added
+round-trip latency without adding safety.
+
+If you change the header format or add a new command type on the Android
+side, `bt_server.py` (in `tesla-panel`) must change to match, and the
+updated file has to actually be redeployed to the Pi — nothing automates
+that.
 
 ## Things that will bite you
 

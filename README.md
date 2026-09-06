@@ -21,10 +21,11 @@ Bluetooth. The panel itself is driven by a Raspberry Pi (3B/3B+).
     for the panel to display.
   - `LegacyCommand` — sends a named script/keyword the Pi-side software already
     knows how to run (a leftover command style from before images were used).
-- Messages are framed as: a command-type string (`image_command` /
-  `legacy_command`), then the payload, chunked into ~980-byte writes over the
-  socket (with a read after each chunk, presumably as a basic ack), then a
-  final `DONE` marker.
+- Messages are framed as `[1 byte command type][4 bytes big-endian payload
+  length][payload]`, then a single-byte status response. `BluetoothClient`
+  writes the whole thing in one shot — no manual chunking or sentinel
+  values, since RFCOMM is a reliable ordered stream that already handles
+  fragmentation/reassembly transparently.
 - On button release, `PanelCommand.kill()` sends a `kill` message to stop
   whatever's currently showing on the panel.
 

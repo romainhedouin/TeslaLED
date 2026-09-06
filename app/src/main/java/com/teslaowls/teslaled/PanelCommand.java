@@ -13,7 +13,7 @@ public abstract class PanelCommand {
     public abstract boolean sendCommand(BluetoothClient bluetoothClient, AssetManager assetManager);
 
     public void kill(BluetoothClient bluetoothClient) {
-        bluetoothClient.sendMessage("kill".getBytes());
+        bluetoothClient.sendCommand(BluetoothClient.COMMAND_KILL, new byte[0]);
     }
 
     public int getSleepDurationMs() {

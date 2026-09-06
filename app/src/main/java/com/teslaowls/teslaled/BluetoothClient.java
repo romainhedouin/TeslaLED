@@ -40,10 +40,14 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.util.Arrays;
 import java.util.UUID;
 
 public class BluetoothClient extends Context {
+
+    public static final int COMMAND_IMAGE = 0;
+    public static final int COMMAND_LEGACY = 1;
+    public static final int COMMAND_KILL = 2;
+    private static final int STATUS_OK = 0;
 
     private BluetoothDevice device = null;
     private BluetoothSocket socket = null;
@@ -108,33 +112,35 @@ public class BluetoothClient extends Context {
         System.out.println("[+] Socket closed");
     }
 
-    public boolean sendMessage(byte[] message) {
+    /**
+     * Wire format: [1 byte command type][4 bytes big-endian payload length][payload],
+     * then a single-byte status response (0 = OK, anything else = error).
+     * RFCOMM is a reliable ordered stream (like TCP) so there's no need to
+     * hand-chunk the payload or use a sentinel value to mark the end -
+     * OutputStream.write(byte[]) already blocks until everything is written,
+     * and the length prefix tells the far end exactly how many bytes to read.
+     */
+    public boolean sendCommand(int commandType, byte[] payload) {
         try {
             OutputStream outputStream = this.socket.getOutputStream();
-            int chunkSize = 980;
-            for (int i = 0; i < message.length; i += chunkSize) {
-                byte[] chunk = Arrays.copyOfRange(message, i, Math.min(i + chunkSize, message.length));
-                outputStream.write(chunk);
-                outputStream.flush();
-
-                InputStream inputStream = this.socket.getInputStream();
-                byte[] buffer = new byte[1024];
-                int read = inputStream.read(buffer);
-                String response = new String(buffer, 0, read);
+            int length = payload.length;
+            byte[] header = new byte[]{
+                    (byte) commandType,
+                    (byte) (length >>> 24),
+                    (byte) (length >>> 16),
+                    (byte) (length >>> 8),
+                    (byte) length,
+            };
+            outputStream.write(header);
+            if (length > 0) {
+                outputStream.write(payload);
             }
-            byte[] chunk = "DONE".getBytes();
-            outputStream = this.socket.getOutputStream();
-            outputStream.write(chunk);
             outputStream.flush();
 
-            InputStream inputStream = this.socket.getInputStream();
-            byte[] buffer = new byte[1024];
-            int read = inputStream.read(buffer);
-            String response = new String(buffer, 0, read);
-
-            return true;
+            int status = this.socket.getInputStream().read();
+            return status == STATUS_OK;
         } catch (IOException e) {
-            System.out.println("[-] Message sending failed");
+            System.out.println("[-] Command sending failed");
             e.printStackTrace();
             return false;
         }

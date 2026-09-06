@@ -22,17 +22,6 @@ public class LegacyCommand extends PanelCommand {
 
     @Override
     public boolean sendCommand(BluetoothClient bluetoothClient, AssetManager assetManager) {
-        if (bluetoothClient.sendMessage("legacy_command".getBytes())) {
-            System.out.println("[+] Able to send legacy command.");
-            if (bluetoothClient.sendMessage(this.scriptName.getBytes())) {
-                return true;
-            } else {
-                System.out.println("[-] Couldn't send legacy command.");
-                return false;
-            }
-        } else {
-            System.out.println("[-] Couldn't use legacy command.");
-            return false;
-        }
+        return bluetoothClient.sendCommand(BluetoothClient.COMMAND_LEGACY, this.scriptName.getBytes());
     }
 }
