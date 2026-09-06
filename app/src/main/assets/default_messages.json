@@ -1,0 +1,89 @@
+[
+  {
+    "id": "bonjour",
+    "label": "Bonjour",
+    "category": "Greetings",
+    "language": "fr",
+    "frames": [ { "asset": "bonjour.ppm", "durationMs": 3000 } ]
+  },
+  {
+    "id": "hello",
+    "label": "Hello",
+    "category": "Greetings",
+    "language": "en",
+    "frames": [ { "asset": "hello.ppm", "durationMs": 3000 } ]
+  },
+  {
+    "id": "merci",
+    "label": "Merci",
+    "category": "Courtesy",
+    "language": "fr",
+    "frames": [ { "asset": "merci.ppm", "durationMs": 3000 } ]
+  },
+  {
+    "id": "thanks",
+    "label": "Thanks",
+    "category": "Courtesy",
+    "language": "en",
+    "frames": [ { "asset": "thanks.ppm", "durationMs": 3000 } ]
+  },
+  {
+    "id": "desole",
+    "label": "Desole",
+    "category": "Courtesy",
+    "language": "fr",
+    "frames": [ { "asset": "desole.ppm", "durationMs": 3000 } ]
+  },
+  {
+    "id": "sorry",
+    "label": "Sorry",
+    "category": "Courtesy",
+    "language": "en",
+    "frames": [ { "asset": "sorry.ppm", "durationMs": 3000 } ]
+  },
+  {
+    "id": "feu-croisement",
+    "label": "Feux de croisement",
+    "category": "Traffic-safety",
+    "language": "fr",
+    "frames": [ { "asset": "feu-croisement.ppm", "durationMs": 4000 } ]
+  },
+  {
+    "id": "clignotants",
+    "label": "Clignotants",
+    "category": "Traffic-safety",
+    "language": "fr",
+    "frames": [ { "asset": "clignotants.ppm", "durationMs": 4000 } ]
+  },
+  {
+    "id": "distance",
+    "label": "Distance",
+    "category": "Traffic-safety",
+    "language": "fr",
+    "frames": [ { "asset": "distance.ppm", "durationMs": 6000 } ]
+  },
+  {
+    "id": "tesla",
+    "label": "Tesla",
+    "category": "Fun",
+    "language": "",
+    "frames": [ { "asset": "tesla.ppm", "durationMs": 2000 } ]
+  },
+  {
+    "id": "tesla-heart",
+    "label": "Tesla ❤️",
+    "category": "Fun",
+    "language": "",
+    "frames": [
+      { "asset": "tesla.ppm", "durationMs": 4000 },
+      { "asset": "red_heart.ppm", "durationMs": 1000 }
+    ]
+  },
+  {
+    "id": "heart",
+    "label": "❤️",
+    "category": "Fun",
+    "language": "",
+    "frames": [ { "asset": "red_heart.ppm", "durationMs": 2000 } ]
+  }
+]

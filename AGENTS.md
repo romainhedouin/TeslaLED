@@ -24,9 +24,12 @@ single-byte status response (`0` = OK, anything else = error).
 `BluetoothClient.sendCommand()` builds and writes that header + payload in
 one shot; `bt_server.py`'s `handle_one_command()` reads exactly
 `HEADER_SIZE` bytes then exactly `length` more via a `recv_exact()` loop, and
-dispatches on the command type (`COMMAND_IMAGE` / `COMMAND_LEGACY` /
-`COMMAND_KILL`, defined identically on both sides — keep the constants in
-sync if you ever add one).
+dispatches on the command type (`COMMAND_IMAGE` / `COMMAND_KILL` /
+`COMMAND_SET_BRIGHTNESS`, defined identically on both sides — keep the
+constants in sync if you ever add one). `COMMAND_SET_BRIGHTNESS`'s payload is
+a single byte, 1-100; `MessageSender` sends it before every message's first
+frame rather than tracking whether the Pi's already up to date, since it's
+cheap and keeps the client stateless.
 
 This replaced an earlier ad-hoc scheme (chunk the payload, send an `"ack"`
 after each chunk, terminate with a literal `"DONE"` marker) that was fragile
@@ -59,15 +62,6 @@ that.
 - The target Pi's Bluetooth MAC is hardcoded in
   `BluetoothClient.findDevice()`. Any test/build against real hardware needs
   that value updated to match whichever Pi you're actually talking to.
-- `BluetoothClient extends Context` purely to get access to
-  `ActivityCompat.checkSelfPermission()`. Every other `Context` method is a
-  stub returning `null`/`0`/`false`. It holds a real `Context` in
-  `realContext` (passed in via the constructor) specifically so permission
-  checks reflect actual OS state — the old version checked permission on
-  itself, which always returned `PERMISSION_GRANTED` regardless of reality
-  and crashed with `SecurityException` at the real `socket.connect()` call.
-  Do not call any other inherited method expecting real behavior, and do not
-  use the fake-Context pattern as a template elsewhere.
 - `BLUETOOTH_CONNECT` is a runtime permission on Android 12+ (targetSdk 31+
   here). Declaring it in the manifest isn't enough — `MainActivity` must
   request it (`onCreate`) and code that touches `BluetoothClient` must check
@@ -83,17 +77,37 @@ that.
   `tesla-panel`'s `tesla/README.md` troubleshooting section. Confirmed by
   reproducing it with the LED matrix library's own test patterns, no
   Bluetooth/Android involved at all.
+- `BluetoothClient` discards (closes + nulls) its socket on any write/read
+  failure, so `isConnected()` correctly reports false and the next `send()`
+  opens a fresh connection. Without this, Android's `BluetoothSocket` can
+  keep reporting `isConnected() == true` even after the remote end is long
+  gone (e.g. `teslabot` restarted on the Pi) - discovered when redeploying a
+  Pi-side fix mid-session left the app writing into a socket that failed
+  with "Broken pipe" on every subsequent send until reinstalled.
+- Two Android view-layout traps hit during development, worth knowing before
+  reintroducing either pattern: (1) constructing a class that touches
+  `Context` methods (e.g. `SharedPreferences`) as an `Activity` *field
+  initializer* crashes with a `NullPointerException` - field initializers
+  run before `attachBaseContext()`, so do that construction in `onCreate()`
+  instead. (2) `GridLayout` with per-row fixed heights and `weight=1f`
+  specs breaks down once the total minimum row height exceeds the
+  container's available height (logs "constraints ... are inconsistent");
+  wrapping it in a scrolling container (so it's measured with unspecified
+  height) avoids the conflict entirely rather than trying to tune weights.
 
 ## Conventions actually in use (not necessarily best practice, but consistent)
 
-- One `PanelCommand` subclass per command type (`ImageCommand`,
-  `LegacyCommand`); `MainActivity` wires each into a button via a
-  `LinkedHashMap<String, PanelCommand>` — order in that map is the on-screen
-  button order.
-- Status feedback is a temporary button background color flash (green/red),
-  not a dedicated status UI.
-- `.ppm` is the image format sent to the panel — check `app/src/main/assets`
-  for existing examples before adding a new image-based command.
+- Everything the panel can show is a `PanelMessage` (one or more `Frame`s -
+  see `model/`); there's no separate class hierarchy per content type
+  anymore. `MessageAdapter` binds them into `MainActivity`'s thumbnail grid,
+  filtered by the category/language chips.
+- Status feedback for the browsing grid is via the "now showing" preview
+  pane (bound to `MessageSender.Listener`), not per-card color flashes.
+- `.ppm` (P6, 64×32) is the format every frame is sent as, whether it's a
+  bundled asset or `PixelFontRenderer`-generated text — `ppm/PpmCodec`
+  encodes/decodes it, `ppm/PpmBitmap` additionally decodes+upscales
+  (nearest-neighbor) for on-screen thumbnails/previews so they stay crisp
+  rather than smoothed.
 
 ## Build/verify
 

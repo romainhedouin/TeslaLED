@@ -16,8 +16,8 @@ import java.util.UUID;
 public class BluetoothClient {
 
     public static final int COMMAND_IMAGE = 0;
-    public static final int COMMAND_LEGACY = 1;
     public static final int COMMAND_KILL = 2;
+    public static final int COMMAND_SET_BRIGHTNESS = 3;
     private static final int STATUS_OK = 0;
 
     private final Context context;
@@ -69,6 +69,7 @@ public class BluetoothClient {
         } catch (IOException e) {
             System.out.println("[-] Socket connection failed");
             e.printStackTrace();
+            discardStaleSocket();
         }
     }
 
@@ -113,8 +114,26 @@ public class BluetoothClient {
         } catch (IOException e) {
             System.out.println("[-] Command sending failed");
             e.printStackTrace();
+            // The remote end (Pi) may have gone away without us noticing -
+            // e.g. its process restarted - in which case this socket is
+            // permanently broken even though Android's isConnected() can
+            // keep reporting true. Discard it so the next send() attempt
+            // opens a fresh connection instead of repeating the same
+            // failing write forever.
+            discardStaleSocket();
             return false;
         }
+    }
+
+    private void discardStaleSocket() {
+        if (this.socket == null) {
+            return;
+        }
+        try {
+            this.socket.close();
+        } catch (IOException ignored) {
+        }
+        this.socket = null;
     }
 
     public boolean isConnected() {
