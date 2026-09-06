@@ -45,21 +45,21 @@
     "id": "feu-croisement",
     "label": "Feux de croisement",
     "category": "Traffic-safety",
-    "language": "fr",
+    "language": "",
     "frames": [ { "asset": "feu-croisement.ppm", "durationMs": 4000 } ]
   },
   {
     "id": "clignotants",
     "label": "Clignotants",
     "category": "Traffic-safety",
-    "language": "fr",
+    "language": "",
     "frames": [ { "asset": "clignotants.ppm", "durationMs": 4000 } ]
   },
   {
     "id": "distance",
     "label": "Distance",
     "category": "Traffic-safety",
-    "language": "fr",
+    "language": "",
     "frames": [ { "asset": "distance.ppm", "durationMs": 6000 } ]
   },
   {

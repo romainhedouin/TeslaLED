@@ -4,10 +4,14 @@ import android.Manifest;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.os.Bundle;
+import android.view.Menu;
+import android.view.MenuItem;
 import android.widget.ImageView;
+import android.widget.PopupMenu;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.recyclerview.widget.GridLayoutManager;
@@ -36,8 +40,9 @@ public class MainActivity extends AppCompatActivity {
         put("Custom", PanelMessage.CATEGORY_CUSTOM);
     }};
 
-    private static final Map<String, String> LANGUAGE_CHIPS = new LinkedHashMap<String, String>() {{
-        put("All", null);
+    // Menu item titles shown for the current language filter, in cycle order.
+    private static final Map<String, String> LANGUAGE_OPTIONS = new LinkedHashMap<String, String>() {{
+        put("ALL", null);
         put("FR", PanelMessage.LANGUAGE_FR);
         put("EN", PanelMessage.LANGUAGE_EN);
     }};
@@ -49,7 +54,8 @@ public class MainActivity extends AppCompatActivity {
     MessageAdapter messageAdapter;
 
     private String selectedCategory = null;
-    private String selectedLanguage = null;
+    private String selectedLanguageLabel = "ALL";
+    private MenuItem languageMenuItem;
 
     private ImageView nowShowingThumbnail;
     private TextView nowShowingLabel;
@@ -91,20 +97,49 @@ public class MainActivity extends AppCompatActivity {
 
         RecyclerView recyclerView = findViewById(R.id.message_grid);
         recyclerView.setLayoutManager(new GridLayoutManager(this, 2));
-        messageAdapter = new MessageAdapter(messageStore.getFiltered(null, null), this::sendMessage);
+        messageAdapter = new MessageAdapter(messageStore.getFiltered(null, null), this::sendMessage, this::confirmDeleteMessage);
         recyclerView.setAdapter(messageAdapter);
 
         setUpChipGroup(R.id.category_filter, CATEGORY_CHIPS, value -> {
             selectedCategory = value;
             refreshMessageList();
         });
-        setUpChipGroup(R.id.language_filter, LANGUAGE_CHIPS, value -> {
-            selectedLanguage = value;
-            refreshMessageList();
-        });
 
         FloatingActionButton fab = findViewById(R.id.create_message_fab);
         fab.setOnClickListener(v -> startActivity(new Intent(this, CreateMessageActivity.class)));
+    }
+
+    @Override
+    public boolean onCreateOptionsMenu(Menu menu) {
+        getMenuInflater().inflate(R.menu.main_menu, menu);
+        languageMenuItem = menu.findItem(R.id.action_language);
+        languageMenuItem.setTitle(selectedLanguageLabel);
+        return true;
+    }
+
+    @Override
+    public boolean onOptionsItemSelected(MenuItem item) {
+        if (item.getItemId() == R.id.action_language) {
+            showLanguageMenu();
+            return true;
+        }
+        return super.onOptionsItemSelected(item);
+    }
+
+    private void showLanguageMenu() {
+        android.view.View anchor = findViewById(R.id.action_language);
+        PopupMenu popup = new PopupMenu(this, anchor != null ? anchor : findViewById(android.R.id.content));
+        for (String label : LANGUAGE_OPTIONS.keySet()) {
+            popup.getMenu().add(label);
+        }
+        popup.setOnMenuItemClickListener(item -> {
+            String label = item.getTitle().toString();
+            selectedLanguageLabel = label;
+            languageMenuItem.setTitle(label);
+            refreshMessageList();
+            return true;
+        });
+        popup.show();
     }
 
     @Override
@@ -143,7 +178,8 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void refreshMessageList() {
-        messageAdapter.setMessages(messageStore.getFiltered(selectedCategory, selectedLanguage));
+        String language = LANGUAGE_OPTIONS.get(selectedLanguageLabel);
+        messageAdapter.setMessages(messageStore.getFiltered(selectedCategory, language));
     }
 
     private void sendMessage(PanelMessage message) {
@@ -155,5 +191,21 @@ public class MainActivity extends AppCompatActivity {
         if (!success) {
             Toast.makeText(this, "Failed to send message.", Toast.LENGTH_SHORT).show();
         }
+    }
+
+    private void confirmDeleteMessage(PanelMessage message) {
+        new AlertDialog.Builder(this)
+                .setTitle("Delete \"" + message.label + "\"?")
+                .setPositiveButton("Delete", (dialog, which) -> {
+                    try {
+                        messageStore.deleteUserMessage(message.id);
+                        refreshMessageList();
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                        Toast.makeText(this, "Failed to delete message.", Toast.LENGTH_SHORT).show();
+                    }
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
     }
 }

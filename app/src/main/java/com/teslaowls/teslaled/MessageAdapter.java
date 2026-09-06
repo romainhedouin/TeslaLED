@@ -21,12 +21,19 @@ public class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.ViewHold
         void onMessageClick(PanelMessage message);
     }
 
+    public interface OnMessageLongClickListener {
+        void onMessageLongClick(PanelMessage message);
+    }
+
     private List<PanelMessage> messages;
     private final OnMessageClickListener listener;
+    private final OnMessageLongClickListener longClickListener;
 
-    public MessageAdapter(List<PanelMessage> messages, OnMessageClickListener listener) {
+    public MessageAdapter(List<PanelMessage> messages, OnMessageClickListener listener,
+                          OnMessageLongClickListener longClickListener) {
         this.messages = messages;
         this.listener = listener;
+        this.longClickListener = longClickListener;
     }
 
     public void setMessages(List<PanelMessage> messages) {
@@ -48,6 +55,13 @@ public class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.ViewHold
         holder.thumbnail.setImageBitmap(bitmap);
         holder.label.setText(message.label);
         holder.itemView.setOnClickListener(v -> listener.onMessageClick(message));
+        holder.itemView.setOnLongClickListener(v -> {
+            if (!message.builtIn) {
+                longClickListener.onMessageLongClick(message);
+                return true;
+            }
+            return false;
+        });
     }
 
     @Override
