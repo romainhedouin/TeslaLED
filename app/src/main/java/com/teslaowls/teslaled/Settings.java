@@ -11,8 +11,12 @@ public class Settings {
     private static final String PREFS_NAME = "settings";
     private static final String KEY_BRIGHTNESS = "brightness";
     private static final String KEY_DISPLAY_LANGUAGE = "display_language";
+    private static final String KEY_EMOJI_DURATION_SECONDS = "emoji_duration_seconds";
     private static final int DEFAULT_BRIGHTNESS = 90;
     private static final String DEFAULT_DISPLAY_LANGUAGE = PanelMessage.LANGUAGE_EN;
+    private static final int DEFAULT_EMOJI_DURATION_SECONDS = 3;
+    public static final int MIN_EMOJI_DURATION_SECONDS = 1;
+    public static final int MAX_EMOJI_DURATION_SECONDS = 30;
 
     private final SharedPreferences prefs;
 
@@ -40,5 +44,15 @@ public class Settings {
 
     public void setDisplayLanguage(String language) {
         prefs.edit().putString(KEY_DISPLAY_LANGUAGE, language).apply();
+    }
+
+    /** How long a picked emoji stays on the panel, in seconds. */
+    public int getEmojiDurationSeconds() {
+        return prefs.getInt(KEY_EMOJI_DURATION_SECONDS, DEFAULT_EMOJI_DURATION_SECONDS);
+    }
+
+    public void setEmojiDurationSeconds(int seconds) {
+        int clamped = Math.max(MIN_EMOJI_DURATION_SECONDS, Math.min(MAX_EMOJI_DURATION_SECONDS, seconds));
+        prefs.edit().putInt(KEY_EMOJI_DURATION_SECONDS, clamped).apply();
     }
 }

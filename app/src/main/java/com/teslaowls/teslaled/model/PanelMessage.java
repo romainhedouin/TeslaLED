@@ -11,6 +11,7 @@ public class PanelMessage {
     public static final String CATEGORY_FUN = "Fun";
     public static final String CATEGORY_DATA = "Data";
     public static final String CATEGORY_CUSTOM = "Custom";
+    public static final String CATEGORY_EMOJI = "Emoji";
 
     /** Language-neutral, e.g. an emoji or a universally-understood image. */
     public static final String LANGUAGE_NONE = "";

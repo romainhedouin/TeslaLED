@@ -7,10 +7,13 @@ import android.location.LocationManager;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.text.Editable;
+import android.text.TextWatcher;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
 import android.widget.Button;
+import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.PopupMenu;
 import android.widget.TextView;
@@ -32,6 +35,7 @@ import com.teslaowls.teslaled.data.TimeDataSource;
 import com.teslaowls.teslaled.model.Frame;
 import com.teslaowls.teslaled.model.PanelMessage;
 import com.teslaowls.teslaled.ppm.PpmBitmap;
+import com.teslaowls.teslaled.render.EmojiRenderer;
 import com.teslaowls.teslaled.render.PixelFontRenderer;
 import com.teslaowls.teslaled.storage.MessageStore;
 
@@ -52,6 +56,7 @@ public class MainActivity extends AppCompatActivity {
         put("Fun", PanelMessage.CATEGORY_FUN);
         put("Data", PanelMessage.CATEGORY_DATA);
         put("Custom", PanelMessage.CATEGORY_CUSTOM);
+        put("Emoji", PanelMessage.CATEGORY_EMOJI);
     }};
 
     // Menu item titles shown for the current language filter, in cycle order.
@@ -81,6 +86,11 @@ public class MainActivity extends AppCompatActivity {
     private ImageView nowShowingThumbnail;
     private TextView nowShowingLabel;
     private Button stopButton;
+    private RecyclerView messageGrid;
+    private View emojiPanel;
+    private EditText emojiInput;
+    private TextView emojiDurationLabel;
+    private int emojiDurationSeconds;
     private boolean isDisplaying = false;
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private final Runnable connectionPoll = new Runnable() {
@@ -150,18 +160,75 @@ public class MainActivity extends AppCompatActivity {
             }
         });
 
-        RecyclerView recyclerView = findViewById(R.id.message_grid);
-        recyclerView.setLayoutManager(new GridLayoutManager(this, 2));
+        messageGrid = findViewById(R.id.message_grid);
+        messageGrid.setLayoutManager(new GridLayoutManager(this, 2));
         messageAdapter = new MessageAdapter(messageStore.getFiltered(null, null), this::sendMessage, this::confirmDeleteMessage);
-        recyclerView.setAdapter(messageAdapter);
+        messageGrid.setAdapter(messageAdapter);
+
+        setUpEmojiPanel();
 
         setUpChipGroup(R.id.category_filter, CATEGORY_CHIPS, value -> {
             selectedCategory = value;
-            refreshMessageList();
+            boolean isEmoji = PanelMessage.CATEGORY_EMOJI.equals(value);
+            emojiPanel.setVisibility(isEmoji ? View.VISIBLE : View.GONE);
+            messageGrid.setVisibility(isEmoji ? View.GONE : View.VISIBLE);
+            if (!isEmoji) {
+                refreshMessageList();
+            }
         });
 
         FloatingActionButton fab = findViewById(R.id.create_message_fab);
         fab.setOnClickListener(v -> startActivity(new Intent(this, CreateMessageActivity.class)));
+    }
+
+    private void setUpEmojiPanel() {
+        emojiPanel = findViewById(R.id.emoji_panel);
+        emojiInput = findViewById(R.id.emoji_input);
+        emojiDurationLabel = findViewById(R.id.emoji_duration_label);
+
+        emojiDurationSeconds = settings.getEmojiDurationSeconds();
+        emojiDurationLabel.setText(emojiDurationSeconds + "s");
+
+        findViewById(R.id.emoji_duration_minus).setOnClickListener(v -> adjustEmojiDuration(-1));
+        findViewById(R.id.emoji_duration_plus).setOnClickListener(v -> adjustEmojiDuration(1));
+
+        // A tap on the emoji keyboard key inserts one grapheme (possibly
+        // several UTF-16 chars for a ZWJ sequence/skin-tone modifier) in one
+        // shot, so send as soon as anything appears, then clear the field so
+        // the box is ready for the next pick rather than accumulating text.
+        emojiInput.addTextChangedListener(new TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence s, int start, int count, int after) {
+            }
+
+            @Override
+            public void onTextChanged(CharSequence s, int start, int before, int count) {
+            }
+
+            @Override
+            public void afterTextChanged(Editable s) {
+                String emoji = s.toString();
+                if (emoji.isEmpty()) {
+                    return;
+                }
+                sendEmoji(emoji);
+                emojiInput.setText("");
+            }
+        });
+    }
+
+    private void adjustEmojiDuration(int delta) {
+        emojiDurationSeconds = Math.max(Settings.MIN_EMOJI_DURATION_SECONDS,
+                Math.min(Settings.MAX_EMOJI_DURATION_SECONDS, emojiDurationSeconds + delta));
+        settings.setEmojiDurationSeconds(emojiDurationSeconds);
+        emojiDurationLabel.setText(emojiDurationSeconds + "s");
+    }
+
+    private void sendEmoji(String emoji) {
+        byte[] ppm = EmojiRenderer.render(emoji);
+        PanelMessage message = new PanelMessage("emoji-adhoc", emoji, PanelMessage.CATEGORY_EMOJI, PanelMessage.LANGUAGE_NONE,
+                new Frame(ppm, emojiDurationSeconds * 1000), true, null);
+        sendMessage(message);
     }
 
     private List<PanelMessage> buildLiveMessages() {
