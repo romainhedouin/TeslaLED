@@ -12,6 +12,7 @@ import androidx.core.app.ActivityCompat;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 public class BluetoothClient {
 
@@ -19,6 +20,11 @@ public class BluetoothClient {
     public static final int COMMAND_KILL = 2;
     public static final int COMMAND_SET_BRIGHTNESS = 3;
     private static final int STATUS_OK = 0;
+    // BluetoothSocket.connect() has no documented timeout - in poor radio
+    // conditions it can block far longer than the ~12s Android typically
+    // takes, and every send()/stop() funnels through the single ioHandler
+    // thread that's stuck inside it. This bounds the freeze.
+    private static final int CONNECT_TIMEOUT_MS = 10000;
 
     private final Context context;
     private BluetoothDevice device = null;
@@ -46,15 +52,23 @@ public class BluetoothClient {
         System.out.println("[+] Device found");
     }
 
-    public void createSocket() {
+    /** @return false if the socket couldn't be created (permission denied, no device, or the create call itself threw). */
+    public boolean createSocket() {
         try {
             if (ActivityCompat.checkSelfPermission(this.context, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
-                return;
+                return false;
+            }
+            if (this.device == null) {
+                System.out.println("[-] Couldn't create socket: no device (findDevice() not called, or Bluetooth was off/unsupported).");
+                return false;
             }
             this.socket = this.device.createRfcommSocketToServiceRecord(UUID.fromString("00001101-0000-1000-8000-00805F9B34FB"));
+            return true;
         } catch (IOException e) {
             System.out.println("[-] Couldn't create socket.");
             e.printStackTrace();
+            this.socket = null;
+            return false;
         }
     }
 
@@ -63,8 +77,48 @@ public class BluetoothClient {
             if (ActivityCompat.checkSelfPermission(this.context, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
                 return;
             }
-            this.createSocket();
-            this.socket.connect();
+            // createSocket() can fail (permission, no device, threw) and
+            // leaves this.socket null - calling connect() on it below would
+            // NPE on this thread instead of failing gracefully.
+            if (!this.createSocket()) {
+                return;
+            }
+
+            final BluetoothSocket socketToConnect = this.socket;
+            final AtomicBoolean connectFinished = new AtomicBoolean(false);
+            // BluetoothSocket.connect() has no documented timeout and can
+            // hang indefinitely in poor radio conditions. Every send()/stop()
+            // funnels through the single ioHandler thread that's blocked
+            // inside this call, so an unbounded hang here freezes the whole
+            // app's Bluetooth pipeline, Stop button included. Force it to
+            // give up after CONNECT_TIMEOUT_MS by closing the socket out
+            // from under it, which makes the blocked connect() throw.
+            Thread watchdog = new Thread(() -> {
+                try {
+                    Thread.sleep(CONNECT_TIMEOUT_MS);
+                } catch (InterruptedException e) {
+                    return; // connect() already finished; nothing to do.
+                }
+                synchronized (connectFinished) {
+                    if (!connectFinished.get()) {
+                        System.out.println("[-] Socket connect timed out after " + CONNECT_TIMEOUT_MS + "ms, forcing it closed");
+                        try {
+                            socketToConnect.close();
+                        } catch (IOException ignored) {
+                        }
+                    }
+                }
+            });
+            watchdog.setDaemon(true);
+            watchdog.start();
+            try {
+                socketToConnect.connect();
+            } finally {
+                synchronized (connectFinished) {
+                    connectFinished.set(true);
+                }
+                watchdog.interrupt();
+            }
             System.out.println("[+] Socket connected");
         } catch (IOException e) {
             System.out.println("[-] Socket connection failed");

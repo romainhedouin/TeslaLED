@@ -9,15 +9,17 @@ This repo has the Android client only (`app/`). The Pi-side receiver used to
 be duplicated here under `pi/`, but that was a stale fork of what's now
 maintained at
 [romainhedouin/tesla-panel](https://github.com/romainhedouin/tesla-panel)
-(`tesla/` directory there) — it's been removed from here to avoid two copies
-silently drifting apart. Treat `tesla-panel`'s `tesla/` as authoritative for
-anything Pi-side; this repo and that one deploy completely separately
-(one's an APK, the other's copied by hand onto the Pi's home directory and
-run via systemd) and nothing in the build connects them — a protocol change
-requires manually redeploying `bt_server.py` to the actual Pi regardless of
-which repo you edited it in.
+(`bt_server.py` at that repo's root) — it's been removed from here to avoid
+two copies silently drifting apart. Treat `tesla-panel`'s `bt_server.py` as
+authoritative for anything Pi-side (see that repo's own README for the wire
+protocol and deployment details); this repo and that one deploy completely
+separately (one's an APK, the other's copied by hand onto the Pi's home
+directory and run via systemd) and nothing in the build connects them — a
+protocol change requires manually redeploying `bt_server.py` to the actual
+Pi regardless of which repo you edited it in, and nothing checks that the
+Pi is still in sync with what's committed there either.
 
-## The wire protocol (see tesla-panel's `tesla/bt_server.py` for the authoritative receiver side)
+## The wire protocol (see tesla-panel's `bt_server.py` for the authoritative receiver side)
 
 `[1 byte command type][4 bytes big-endian payload length][payload]`, then a
 single-byte status response (`0` = OK, anything else = error).
@@ -69,14 +71,23 @@ that.
   the manifest entry covers it.
 - Pairing a new phone with the Pi will silently fail (no error anywhere, not
   even in `bluetoothctl paired-devices`) unless the Pi has a pairing agent
-  running — see `tesla-panel`'s `tesla/README.md`. This has nothing to do
-  with the Android code; don't go looking for a client-side cause if pairing
-  itself won't complete.
+  running — see `tesla-panel`'s README. This has nothing to do with the
+  Android code; don't go looking for a client-side cause if pairing itself
+  won't complete.
 - A panel showing colored static/noise instead of the actual image is a
   Pi-side GPIO-timing or wiring issue, not an Android-side bug — see
-  `tesla-panel`'s `tesla/README.md` troubleshooting section. Confirmed by
-  reproducing it with the LED matrix library's own test patterns, no
-  Bluetooth/Android involved at all.
+  `tesla-panel`'s README troubleshooting section. Confirmed by reproducing it
+  with the LED matrix library's own test patterns, no Bluetooth/Android
+  involved at all.
+- `BluetoothClient.connect()` guards against `createSocket()` failing (no
+  device, permission denied, or the create call itself throwing) before
+  touching the socket — `createSocket()` returns `false` in all of those
+  cases instead of leaving `this.socket` null for `connect()` to `NPE` on.
+  `connect()` also runs the actual `BluetoothSocket.connect()` call under a
+  watchdog thread that force-closes the socket after `CONNECT_TIMEOUT_MS` —
+  that call has no documented timeout, and everything (`send()`/`stop()`)
+  funnels through the single `ioHandler` thread that would otherwise be
+  stuck inside it indefinitely.
 - `BluetoothClient.sendCommand()` discards (closes + nulls) its socket
   whenever the send fails, whether that's a write/read `IOException` *or* the
   status-byte read returning EOF (`-1`) - the latter happens when the remote
