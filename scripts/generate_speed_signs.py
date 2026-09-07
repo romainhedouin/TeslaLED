@@ -117,19 +117,24 @@ def generate_eu_sign(speed, glyphs):
 
 
 def generate_us_sign(speed, header_glyphs, number_glyphs):
+    # Real US speed-limit signs are portrait (taller than wide) - inset the
+    # rectangle horizontally instead of spanning the full 64px width, so it
+    # isn't a wide short banner on this landscape panel.
+    margin_x = 12
     border = 2
-    header_band_height = 8
+    line_height = 6
     header_ascent, header_descent = 5, 1
     number_ascent, number_descent = 12, 3
 
     pixels = [BLACK] * (WIDTH * HEIGHT)
     for y in range(HEIGHT):
-        for x in range(WIDTH):
-            if border <= x < WIDTH - border and border <= y < HEIGHT - border:
+        for x in range(margin_x, WIDTH - margin_x):
+            if border <= y < HEIGHT - border:
                 pixels[y * WIDTH + x] = WHITE
-    blit_line(pixels, "SPEED LIMIT", header_glyphs, BLACK, header_ascent, header_descent, border, header_band_height)
+    blit_line(pixels, "SPEED", header_glyphs, BLACK, header_ascent, header_descent, border, line_height)
+    blit_line(pixels, "LIMIT", header_glyphs, BLACK, header_ascent, header_descent, border + line_height, line_height)
     blit_line(pixels, str(speed), number_glyphs, BLACK, number_ascent, number_descent,
-              border + header_band_height, HEIGHT - 2 * border - header_band_height)
+              border + 2 * line_height, HEIGHT - 2 * border - 2 * line_height)
     return pixels
 
 
