@@ -16,38 +16,61 @@ Bluetooth. The panel itself is driven by a Raspberry Pi (3B/3B+).
 - The phone pairs with the Raspberry Pi over classic Bluetooth (SPP, RFCOMM),
   connecting to a hardcoded MAC address (`BluetoothClient.findDevice()`).
 - Everything the panel can show is a `PanelMessage` (`model/PanelMessage.java`):
-  a label, a category (Greetings/Courtesy/Traffic-safety/Fun/Custom), an
-  optional language tag (`fr`/`en`/none), and one or more `Frame`s (a ready-
-  to-send 64×32 PPM + a display duration). A single frame is a static image;
-  multiple frames are a slideshow/animation — there's no separate concept
-  for "animation," it's just a `PanelMessage` with more than one frame.
+  a label, a category (Greetings/Courtesy/Traffic-safety/Fun/Data/Custom), an
+  optional language tag (`fr`/`en`/none), and either a fixed list of `Frame`s
+  (a ready-to-send 64×32 PPM + a display duration) or a `LiveDataSource` for
+  the Data category. A single frame is a static image; multiple frames are a
+  slideshow — there's no separate "animation" concept, it's just a
+  `PanelMessage` with more than one frame.
+- The **Data** category (`data/TimeDataSource`, `data/SpeedDataSource`) shows
+  the current time or GPS speed, re-rendered and re-sent once a second until
+  stopped — no fixed duration, no frame list. Labels ("Heure:"/"Time:",
+  "Vitesse:"/"Speed:") follow the app's display language, set via the
+  language menu (see below), not the phone's locale.
 - `storage/MessageStore` loads the bundled defaults (`assets/default_messages.json`
   + the `.ppm` assets it references) and any user-created messages (persisted
-  under the app's internal files dir), and supports filtering by
-  category/language.
+  under the app's internal files dir), filterable by category/language. A
+  message with no language tag is treated as language-neutral and matches
+  every language filter, not just "All" — a message meant for everyone
+  shouldn't disappear because a specific language is selected.
 - `MainActivity` shows those messages as a thumbnail grid (`MessageAdapter`),
-  filterable by category/language chips, with a "now showing" preview pane at
-  the top — accurate for free, since the app is the only thing that ever
-  tells the panel what to display or when to stop.
+  filterable by category chips and an app-bar language popup (next to a
+  brightness popup, 25/50/75/90/100%). A "now showing" bar at the top reads
+  "Connected"/"Not connected" (polled from `BluetoothClient.isConnected()`)
+  when idle and "Displaying..." with a live thumbnail while something's
+  active, plus a Stop button — all accurate for free, since the app is the
+  only thing that ever tells the panel what to display or when to stop.
+  Long-press a custom message's card to delete it (built-in messages can't
+  be deleted).
 - `CreateMessageActivity` (the "+" button) is how you make a custom message:
   a label, category, language, and a list of frames. Each frame is just
   typed text — `render/PixelFontRenderer` rasterizes it using a bitmap (BDF)
-  font bundled from the `rpi-rgb-led-matrix` library (`assets/fonts/9x18B.bdf`),
-  blitting glyph pixels directly with no anti-aliasing, so panel text is
-  always crisp. A frame whose text doesn't fit the panel width is
-  auto-paginated into multiple frames by `render/TextChunker` (word-boundary
-  aware) — long messages split into readable chunks rather than scrolling,
-  since scrolling text is hard to read from a following car.
-- `MessageSender` sends a `PanelMessage`'s frames in order over Bluetooth,
-  timing each one client-side via `Handler.postDelayed`, and sends a final
-  kill once the sequence ends.
+  font bundled from the `rpi-rgb-led-matrix` library (`assets/fonts/9x18B.bdf`;
+  Data's two-line time/speed layout uses the smaller `6x13B.bdf`), blitting
+  glyph pixels directly with no anti-aliasing, so panel text is always crisp.
+  A frame whose text doesn't fit the panel width is auto-paginated into
+  multiple frames by `render/TextChunker` (word-boundary aware) — long
+  messages split into readable chunks rather than scrolling, since scrolling
+  text is hard to read from a following car.
+- `MessageSender` runs all Bluetooth I/O (which blocks - a connect can take
+  several seconds) on a dedicated `HandlerThread`, never the caller's thread,
+  and posts `Listener` callbacks back to the main thread for UI updates. It
+  sends a fixed `PanelMessage`'s frames in order, timing each client-side, or
+  for a live-data message re-renders and re-sends every second until
+  `stop()`. A monotonic `generation` counter (touched only on the I/O thread)
+  lets a `stop()`/new `send()` invalidate any in-flight timers/ticks without
+  locks.
 - Messages are framed as `[1 byte command type][4 bytes big-endian payload
   length][payload]`, then a single-byte status response. `BluetoothClient`
   writes the whole thing in one shot — no manual chunking or sentinel
   values, since RFCOMM is a reliable ordered stream that already handles
   fragmentation/reassembly transparently. Command types: image, kill, and
   set-brightness (see `Settings` — brightness is a persisted app setting,
-  synced to the Pi before every message so it's always current).
+  changeable from the app-bar dropdown, synced to the Pi before every
+  message and pushed immediately on change if already connected).
+- Traffic-safety includes generated EU-style (red circle) and US-style
+  (portrait "SPEED LIMIT" rectangle) speed-limit sign images — see
+  `scripts/generate_speed_signs.py` to regenerate or add more.
 
 ## Requirements
 
@@ -74,16 +97,16 @@ phone directly (`adb install`, AirDrop, etc.) — it isn't published anywhere.
   edit and rebuild.
 - No error surfacing beyond `System.out.println`/`Toast` — failures don't
   produce a real diagnostic message.
-- On Android 12+ (targetSdk 31+), `BLUETOOTH_CONNECT` is a runtime permission.
-  `MainActivity` requests it on launch and re-checks before every command; if
-  you see the app silently no-op on button taps (a toast, no crash), the
-  permission was denied — check phone Settings → Apps → TeslaLED →
+- On Android 12+ (targetSdk 31+), `BLUETOOTH_CONNECT` is a runtime permission,
+  and `ACCESS_FINE_LOCATION` is required for the Data category's speed
+  reading. `MainActivity` requests both on launch; if you see the app
+  silently no-op on button taps (a toast, no crash) or Speed always show
+  "--", one of these was denied — check phone Settings → Apps → TeslaLED →
   Permissions.
 - Multi-frame sequences are "slideshow" pacing (each frame shown for at
   least ~0.5-1s+), not smooth high-fps animation — each frame costs a
-  Bluetooth round trip and the Pi respawning its rendering process. Fine for
-  paginated text or a deliberate slideshow; not meant for anything
-  resembling video.
+  Bluetooth round trip. Fine for paginated text, a deliberate slideshow, or
+  the Data category's 1Hz updates; not meant for anything resembling video.
 - Custom messages currently support text only (no photo import, no freehand
   drawing) — both would fit the same `Frame` model later without changing
   anything else.

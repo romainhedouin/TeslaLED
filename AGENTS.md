@@ -77,13 +77,32 @@ that.
   `tesla-panel`'s `tesla/README.md` troubleshooting section. Confirmed by
   reproducing it with the LED matrix library's own test patterns, no
   Bluetooth/Android involved at all.
-- `BluetoothClient` discards (closes + nulls) its socket on any write/read
-  failure, so `isConnected()` correctly reports false and the next `send()`
-  opens a fresh connection. Without this, Android's `BluetoothSocket` can
-  keep reporting `isConnected() == true` even after the remote end is long
-  gone (e.g. `teslabot` restarted on the Pi) - discovered when redeploying a
-  Pi-side fix mid-session left the app writing into a socket that failed
-  with "Broken pipe" on every subsequent send until reinstalled.
+- `BluetoothClient.sendCommand()` discards (closes + nulls) its socket
+  whenever the send fails, whether that's a write/read `IOException` *or* the
+  status-byte read returning EOF (`-1`) - the latter happens when the remote
+  end (e.g. `teslabot` restarted on the Pi) closes the connection without an
+  error, which Android's `BluetoothSocket.isConnected()` doesn't detect on
+  its own (it only reflects local state). Without discarding on both cases,
+  every future `send()` keeps reusing the same dead socket forever, silently
+  failing. `MessageSender.connectAndSyncBrightness()` also checks this call's
+  return value for the same reason: a failure there can mean the socket was
+  just discarded, so the very next `sendCommand()` would otherwise `NPE` on
+  a null socket instead of failing gracefully.
+- All `BluetoothClient` I/O runs on `MessageSender`'s own `HandlerThread`
+  (`ioHandler`), never on the caller's thread - a socket connect can block
+  for several seconds, and doing that on the UI thread from a button click
+  freezes the whole app (manifests as "spent Nms processing MotionEvent"
+  warnings and taps that appear to silently do nothing for several
+  seconds). `currentMessage`/`generation` are only ever touched on
+  `ioHandler`'s thread; `Listener` callbacks are posted back to the main
+  thread since they touch views. Don't add a Bluetooth call anywhere else
+  without routing it through `ioHandler`.
+- `MessageStore.getFiltered()` treats a language-neutral message (no
+  language tag) as matching *every* language filter, not just "All" - a
+  message meant for everyone shouldn't disappear just because the user
+  filtered to a specific language. Easy regression to reintroduce if this
+  method gets touched again: the free-pass check must be on the message's
+  own language, not only on whether the selected filter is empty.
 - Two Android view-layout traps hit during development, worth knowing before
   reintroducing either pattern: (1) constructing a class that touches
   `Context` methods (e.g. `SharedPreferences`) as an `Activity` *field
@@ -97,17 +116,28 @@ that.
 
 ## Conventions actually in use (not necessarily best practice, but consistent)
 
-- Everything the panel can show is a `PanelMessage` (one or more `Frame`s -
-  see `model/`); there's no separate class hierarchy per content type
-  anymore. `MessageAdapter` binds them into `MainActivity`'s thumbnail grid,
-  filtered by the category/language chips.
-- Status feedback for the browsing grid is via the "now showing" preview
-  pane (bound to `MessageSender.Listener`), not per-card color flashes.
+- Everything the panel can show is a `PanelMessage` (one or more `Frame`s, or
+  a `LiveDataSource` for the Data category — see `model/`); there's no
+  separate class hierarchy per content type. `MessageAdapter` binds them into
+  `MainActivity`'s thumbnail grid, filtered by category chips; the language
+  filter is an app-bar popup menu (`showLanguageMenu()`), not a chip row —
+  it was moved there deliberately to stop it eating vertical space, and it
+  doubles as the "display language" for Data's generated labels.
+- A `LiveDataSource` (`model/LiveDataSource.java`) is just
+  `byte[] renderFrame()` — implement it to add a new live-updating category
+  (see `data/TimeDataSource`/`data/SpeedDataSource` for the pattern:
+  construct with a `PixelFontRenderer` + `Settings`, render on demand,
+  `MessageSender` handles the re-render/re-send loop). `renderTwoLine()` on
+  `PixelFontRenderer` is what these use for the label/value split — top half
+  is the label, bottom half the value, both centered independently.
+- Status feedback for the browsing grid is via the "now showing" bar (bound
+  to `MessageSender.Listener` plus a poll of `BluetoothClient.isConnected()`
+  for the idle Connected/Not connected text), not per-card color flashes.
 - `.ppm` (P6, 64×32) is the format every frame is sent as, whether it's a
-  bundled asset or `PixelFontRenderer`-generated text — `ppm/PpmCodec`
-  encodes/decodes it, `ppm/PpmBitmap` additionally decodes+upscales
-  (nearest-neighbor) for on-screen thumbnails/previews so they stay crisp
-  rather than smoothed.
+  bundled asset, `PixelFontRenderer`-generated text, or a `LiveDataSource`
+  frame — `ppm/PpmCodec` encodes/decodes it, `ppm/PpmBitmap` additionally
+  decodes+upscales (nearest-neighbor) for on-screen thumbnails/previews so
+  they stay crisp rather than smoothed.
 
 ## Build/verify
 
