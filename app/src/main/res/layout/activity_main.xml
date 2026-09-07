@@ -36,7 +36,14 @@
                 android:layout_marginStart="12dp"
                 android:textColor="@android:color/white"
                 android:textSize="18sp"
-                android:text="Nothing showing" />
+                android:text="Not connected" />
+
+            <Button
+                android:id="@+id/stop_button"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Stop"
+                android:visibility="gone" />
 
         </LinearLayout>
 

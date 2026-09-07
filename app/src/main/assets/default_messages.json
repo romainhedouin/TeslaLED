@@ -63,6 +63,167 @@
     "frames": [ { "asset": "distance.ppm", "durationMs": 6000 } ]
   },
   {
+    "id": "speed-eu-30",
+    "label": "EU 30",
+    "category": "Traffic-safety",
+    "language": "",
+    "frames": [ { "asset": "speed_eu_30.ppm", "durationMs": 4000 } ]
+  },
+  {
+    "id": "speed-eu-50",
+    "label": "EU 50",
+    "category": "Traffic-safety",
+    "language": "",
+    "frames": [ { "asset": "speed_eu_50.ppm", "durationMs": 4000 } ]
+  },
+  {
+    "id": "speed-eu-70",
+    "label": "EU 70",
+    "category": "Traffic-safety",
+    "language": "",
+    "frames": [ { "asset": "speed_eu_70.ppm", "durationMs": 4000 } ]
+  },
+  {
+    "id": "speed-eu-80",
+    "label": "EU 80",
+    "category": "Traffic-safety",
+    "language": "",
+    "frames": [ { "asset": "speed_eu_80.ppm", "durationMs": 4000 } ]
+  },
+  {
+    "id": "speed-eu-90",
+    "label": "EU 90",
+    "category": "Traffic-safety",
+    "language": "",
+    "frames": [ { "asset": "speed_eu_90.ppm", "durationMs": 4000 } ]
+  },
+  {
+    "id": "speed-eu-110",
+    "label": "EU 110",
+    "category": "Traffic-safety",
+    "language": "",
+    "frames": [ { "asset": "speed_eu_110.ppm", "durationMs": 4000 } ]
+  },
+  {
+    "id": "speed-eu-130",
+    "label": "EU 130",
+    "category": "Traffic-safety",
+    "language": "",
+    "frames": [ { "asset": "speed_eu_130.ppm", "durationMs": 4000 } ]
+  },
+  {
+    "id": "speed-us-10",
+    "label": "US 10",
+    "category": "Traffic-safety",
+    "language": "",
+    "frames": [ { "asset": "speed_us_10.ppm", "durationMs": 4000 } ]
+  },
+  {
+    "id": "speed-us-15",
+    "label": "US 15",
+    "category": "Traffic-safety",
+    "language": "",
+    "frames": [ { "asset": "speed_us_15.ppm", "durationMs": 4000 } ]
+  },
+  {
+    "id": "speed-us-20",
+    "label": "US 20",
+    "category": "Traffic-safety",
+    "language": "",
+    "frames": [ { "asset": "speed_us_20.ppm", "durationMs": 4000 } ]
+  },
+  {
+    "id": "speed-us-25",
+    "label": "US 25",
+    "category": "Traffic-safety",
+    "language": "",
+    "frames": [ { "asset": "speed_us_25.ppm", "durationMs": 4000 } ]
+  },
+  {
+    "id": "speed-us-30",
+    "label": "US 30",
+    "category": "Traffic-safety",
+    "language": "",
+    "frames": [ { "asset": "speed_us_30.ppm", "durationMs": 4000 } ]
+  },
+  {
+    "id": "speed-us-35",
+    "label": "US 35",
+    "category": "Traffic-safety",
+    "language": "",
+    "frames": [ { "asset": "speed_us_35.ppm", "durationMs": 4000 } ]
+  },
+  {
+    "id": "speed-us-40",
+    "label": "US 40",
+    "category": "Traffic-safety",
+    "language": "",
+    "frames": [ { "asset": "speed_us_40.ppm", "durationMs": 4000 } ]
+  },
+  {
+    "id": "speed-us-45",
+    "label": "US 45",
+    "category": "Traffic-safety",
+    "language": "",
+    "frames": [ { "asset": "speed_us_45.ppm", "durationMs": 4000 } ]
+  },
+  {
+    "id": "speed-us-50",
+    "label": "US 50",
+    "category": "Traffic-safety",
+    "language": "",
+    "frames": [ { "asset": "speed_us_50.ppm", "durationMs": 4000 } ]
+  },
+  {
+    "id": "speed-us-55",
+    "label": "US 55",
+    "category": "Traffic-safety",
+    "language": "",
+    "frames": [ { "asset": "speed_us_55.ppm", "durationMs": 4000 } ]
+  },
+  {
+    "id": "speed-us-60",
+    "label": "US 60",
+    "category": "Traffic-safety",
+    "language": "",
+    "frames": [ { "asset": "speed_us_60.ppm", "durationMs": 4000 } ]
+  },
+  {
+    "id": "speed-us-65",
+    "label": "US 65",
+    "category": "Traffic-safety",
+    "language": "",
+    "frames": [ { "asset": "speed_us_65.ppm", "durationMs": 4000 } ]
+  },
+  {
+    "id": "speed-us-70",
+    "label": "US 70",
+    "category": "Traffic-safety",
+    "language": "",
+    "frames": [ { "asset": "speed_us_70.ppm", "durationMs": 4000 } ]
+  },
+  {
+    "id": "speed-us-75",
+    "label": "US 75",
+    "category": "Traffic-safety",
+    "language": "",
+    "frames": [ { "asset": "speed_us_75.ppm", "durationMs": 4000 } ]
+  },
+  {
+    "id": "speed-us-80",
+    "label": "US 80",
+    "category": "Traffic-safety",
+    "language": "",
+    "frames": [ { "asset": "speed_us_80.ppm", "durationMs": 4000 } ]
+  },
+  {
+    "id": "speed-us-85",
+    "label": "US 85",
+    "category": "Traffic-safety",
+    "language": "",
+    "frames": [ { "asset": "speed_us_85.ppm", "durationMs": 4000 } ]
+  },
+  {
     "id": "tesla",
     "label": "Tesla",
     "category": "Fun",

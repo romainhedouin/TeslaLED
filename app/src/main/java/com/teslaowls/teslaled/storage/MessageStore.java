@@ -55,7 +55,12 @@ public class MessageStore {
         List<PanelMessage> result = new ArrayList<>();
         for (PanelMessage message : messages) {
             boolean categoryMatches = category == null || category.isEmpty() || category.equals(message.category);
-            boolean languageMatches = language == null || language.isEmpty() || language.equals(message.language);
+            // A language-neutral message (no language tag) is valid for every
+            // language filter, not just "All" - it shouldn't disappear just
+            // because the user is filtered to FR or EN.
+            boolean languageMatches = language == null || language.isEmpty()
+                    || message.language == null || message.language.isEmpty()
+                    || language.equals(message.language);
             if (categoryMatches && languageMatches) {
                 result.add(message);
             }

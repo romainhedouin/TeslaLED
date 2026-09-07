@@ -9,6 +9,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -102,11 +103,32 @@ public class PixelFontRenderer {
         int width = PpmCodec.PANEL_WIDTH;
         int height = PpmCodec.PANEL_HEIGHT;
         int[] pixels = new int[width * height];
-        java.util.Arrays.fill(pixels, backgroundColor);
+        Arrays.fill(pixels, backgroundColor);
+        blitLine(pixels, width, text, textColor, 0, height);
+        return PpmCodec.encode(pixels, width, height);
+    }
 
+    /**
+     * Renders two independent lines, each centered within its own half of
+     * the panel (rows [0,16) and [16,32)) - used for "label on top, live
+     * value on bottom" data displays (current time, current speed, etc).
+     */
+    public byte[] renderTwoLine(String topText, String bottomText, int textColor, int backgroundColor) {
+        int width = PpmCodec.PANEL_WIDTH;
+        int height = PpmCodec.PANEL_HEIGHT;
+        int[] pixels = new int[width * height];
+        Arrays.fill(pixels, backgroundColor);
+        int halfHeight = height / 2;
+        blitLine(pixels, width, topText, textColor, 0, halfHeight);
+        blitLine(pixels, width, bottomText, textColor, halfHeight, halfHeight);
+        return PpmCodec.encode(pixels, width, height);
+    }
+
+    /** Blits one line of text horizontally centered, vertically centered within [bandTop, bandTop+bandHeight). */
+    private void blitLine(int[] pixels, int width, String text, int textColor, int bandTop, int bandHeight) {
         int textWidth = measureWidth(text);
         int startX = Math.max(0, (width - textWidth) / 2);
-        int baselineFromTop = (height - (fontAscent + fontDescent)) / 2 + fontAscent;
+        int baselineFromTop = bandTop + (bandHeight - (fontAscent + fontDescent)) / 2 + fontAscent;
 
         int penX = startX;
         for (int i = 0; i < text.length(); i++) {
@@ -117,7 +139,7 @@ public class PixelFontRenderer {
             for (int row = 0; row < glyph.bbh; row++) {
                 int heightAboveBaseline = glyph.bbyoff + (glyph.bbh - 1 - row);
                 int y = baselineFromTop - heightAboveBaseline;
-                if (y < 0 || y >= height) {
+                if (y < bandTop || y >= bandTop + bandHeight) {
                     continue;
                 }
                 int rowBits = glyph.rows[row];
@@ -140,7 +162,5 @@ public class PixelFontRenderer {
             }
             penX += glyph.dwidth;
         }
-
-        return PpmCodec.encode(pixels, width, height);
     }
 }
