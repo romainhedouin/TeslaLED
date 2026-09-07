@@ -110,6 +110,16 @@ public class BluetoothClient {
             outputStream.flush();
 
             int status = this.socket.getInputStream().read();
+            if (status == -1) {
+                // Remote end closed the stream without an IOException on
+                // write() - e.g. the Pi's process restarted after this
+                // socket was established. isConnected() would still report
+                // true for this socket, so without discarding it here every
+                // future send() would keep reusing the same dead socket.
+                System.out.println("[-] Command sending failed: remote closed the connection");
+                discardStaleSocket();
+                return false;
+            }
             return status == STATUS_OK;
         } catch (IOException e) {
             System.out.println("[-] Command sending failed");
