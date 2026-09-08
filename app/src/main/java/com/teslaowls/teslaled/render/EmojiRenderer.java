@@ -20,7 +20,15 @@ public class EmojiRenderer {
     private EmojiRenderer() {
     }
 
-    public static byte[] render(String emoji) {
+    /**
+     * @param gammaFactor power-curve adjustment applied per RGB channel
+     *                    before encoding: value' = 255*(value/255)^(1/gammaFactor).
+     *                    1.0 leaves colors unchanged; >1.0 brightens
+     *                    midtones, <1.0 darkens them - some emoji are hard
+     *                    to tell apart on the actual LED panel at full
+     *                    brightness, so this is tuned low by default.
+     */
+    public static byte[] render(String emoji, float gammaFactor) {
         int width = PpmCodec.PANEL_WIDTH;
         int height = PpmCodec.PANEL_HEIGHT;
 
@@ -39,9 +47,22 @@ public class EmojiRenderer {
         int[] pixels = new int[width * height];
         bitmap.getPixels(pixels, 0, width, 0, 0, width, height);
         for (int i = 0; i < pixels.length; i++) {
-            // Bitmap.getPixels() returns ARGB; the panel only wants RGB.
-            pixels[i] &= 0xFFFFFF;
+            pixels[i] = applyGamma(pixels[i], gammaFactor);
         }
         return PpmCodec.encode(pixels, width, height);
+    }
+
+    private static int applyGamma(int argb, float gammaFactor) {
+        int r = gammaChannel((argb >> 16) & 0xFF, gammaFactor);
+        int g = gammaChannel((argb >> 8) & 0xFF, gammaFactor);
+        int b = gammaChannel(argb & 0xFF, gammaFactor);
+        return (r << 16) | (g << 8) | b;
+    }
+
+    private static int gammaChannel(int value, float gammaFactor) {
+        double normalized = value / 255.0;
+        double adjusted = Math.pow(normalized, 1.0 / gammaFactor);
+        int result = (int) Math.round(adjusted * 255);
+        return Math.max(0, Math.min(255, result));
     }
 }

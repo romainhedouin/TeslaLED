@@ -114,6 +114,21 @@ that.
   filtered to a specific language. Easy regression to reintroduce if this
   method gets touched again: the free-pass check must be on the message's
   own language, not only on whether the selected filter is empty.
+- Long-pressing the Emoji category chip is a hidden feature
+  (`MainActivity.startEasterEgg()`), not dead code — it cycles a fixed emoji
+  list via `EasterEggDataSource` (a `LiveDataSource`) until Stop is pressed,
+  found by scanning the chip group for the chip whose text is "Emoji" and
+  attaching `setOnLongClickListener` (returning `true` so the gesture
+  doesn't also toggle the chip's checked state / switch categories). Don't
+  "clean up" that lookup loop thinking it's unused.
+- Contrast was tried as a second emoji-appearance knob (alongside Gamma) and
+  fully removed after real-panel testing showed it made high settings worse,
+  not better — only Gamma remains in `EmojiRenderer`/`Settings`/the emoji
+  panel UI now. A gamma-style brightening curve was also tried as *the*
+  contrast implementation before Gamma existed as its own control, and was
+  also reverted for the same reason (washed the panel out at high values).
+  If either comes back, re-test against the actual panel before trusting it,
+  not just the in-app preview — that's what caught both regressions.
 - Two Android view-layout traps hit during development, worth knowing before
   reintroducing either pattern: (1) constructing a class that touches
   `Context` methods (e.g. `SharedPreferences`) as an `Activity` *field
@@ -149,6 +164,17 @@ that.
   frame — `ppm/PpmCodec` encodes/decodes it, `ppm/PpmBitmap` additionally
   decodes+upscales (nearest-neighbor) for on-screen thumbnails/previews so
   they stay crisp rather than smoothed.
+- The Emoji category isn't a `PanelMessage` list like the others — it's a
+  curated 200-entry grid (`EmojiPickerAdapter`, backed by `MainActivity`'s
+  `EMOJIS` constant) plus a keyboard-fallback `EditText`
+  (`emoji_keyboard_input`) for anything not curated, both funneling into
+  `sendEmoji()`. `EmojiRenderer` renders through `Canvas`/`Paint` instead of
+  `PixelFontRenderer`'s BDF glyph blit, since BDF fonts here don't carry
+  color emoji. The grid always previews at neutral gamma (1.0) regardless of
+  the adjustable Gamma setting below it — only the actual `sendEmoji()` call
+  applies `emojiGamma` — so the picker shows what the emoji *is*, not a live
+  preview of the panel adjustment; that was tried the other way and
+  deliberately reverted.
 
 ## Build/verify
 

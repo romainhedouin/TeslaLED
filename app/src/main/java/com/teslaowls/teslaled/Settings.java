@@ -12,11 +12,15 @@ public class Settings {
     private static final String KEY_BRIGHTNESS = "brightness";
     private static final String KEY_DISPLAY_LANGUAGE = "display_language";
     private static final String KEY_EMOJI_DURATION_SECONDS = "emoji_duration_seconds";
-    private static final int DEFAULT_BRIGHTNESS = 90;
+    private static final int DEFAULT_BRIGHTNESS = 50;
     private static final String DEFAULT_DISPLAY_LANGUAGE = PanelMessage.LANGUAGE_EN;
     private static final int DEFAULT_EMOJI_DURATION_SECONDS = 3;
     public static final int MIN_EMOJI_DURATION_SECONDS = 1;
     public static final int MAX_EMOJI_DURATION_SECONDS = 30;
+    private static final String KEY_EMOJI_GAMMA = "emoji_gamma";
+    private static final float DEFAULT_EMOJI_GAMMA = 0.30f;
+    public static final float MIN_EMOJI_GAMMA = 0.10f;
+    public static final float MAX_EMOJI_GAMMA = 1.00f;
 
     private final SharedPreferences prefs;
 
@@ -54,5 +58,15 @@ public class Settings {
     public void setEmojiDurationSeconds(int seconds) {
         int clamped = Math.max(MIN_EMOJI_DURATION_SECONDS, Math.min(MAX_EMOJI_DURATION_SECONDS, seconds));
         prefs.edit().putInt(KEY_EMOJI_DURATION_SECONDS, clamped).apply();
+    }
+
+    /** Gamma power-curve applied to a rendered emoji's colors - see EmojiRenderer. */
+    public float getEmojiGamma() {
+        return prefs.getFloat(KEY_EMOJI_GAMMA, DEFAULT_EMOJI_GAMMA);
+    }
+
+    public void setEmojiGamma(float gamma) {
+        float clamped = Math.max(MIN_EMOJI_GAMMA, Math.min(MAX_EMOJI_GAMMA, gamma));
+        prefs.edit().putFloat(KEY_EMOJI_GAMMA, clamped).apply();
     }
 }

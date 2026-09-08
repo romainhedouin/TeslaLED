@@ -32,6 +32,7 @@ import com.google.android.material.floatingactionbutton.FloatingActionButton;
 import com.teslaowls.teslaled.data.LocationSpeedProvider;
 import com.teslaowls.teslaled.data.SpeedDataSource;
 import com.teslaowls.teslaled.data.TimeDataSource;
+import com.teslaowls.teslaled.model.EasterEggDataSource;
 import com.teslaowls.teslaled.model.Frame;
 import com.teslaowls.teslaled.model.PanelMessage;
 import com.teslaowls.teslaled.ppm.PpmBitmap;
@@ -39,6 +40,7 @@ import com.teslaowls.teslaled.render.EmojiRenderer;
 import com.teslaowls.teslaled.render.PixelFontRenderer;
 import com.teslaowls.teslaled.storage.MessageStore;
 
+import java.util.Arrays;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -66,8 +68,46 @@ public class MainActivity extends AppCompatActivity {
         put("EN", PanelMessage.LANGUAGE_EN);
     }};
 
-    private static final int[] BRIGHTNESS_OPTIONS = {25, 50, 75, 90, 100};
+    private static final int[] BRIGHTNESS_OPTIONS = {5, 25, 50, 75, 90, 100};
     private static final long CONNECTION_POLL_MS = 3000;
+    private static final float EMOJI_GAMMA_STEP = 0.10f;
+
+    // Curated rather than a full system emoji list - this is a car dashboard,
+    // not a keyboard, so it stays to a scrollable but bounded set of the most
+    // popular/useful ones. Anything else is reachable via emojiKeyboardInput.
+    // Weighted toward faces/hands/hearts per request; no animals except
+    // monkeys, no food.
+    private static final List<String> EMOJIS = Arrays.asList(
+            // Faces (110)
+            "😀", "😃", "😄", "😁", "😆", "😅", "🤣", "😂", "🙂", "🙃", "🫠", "😉", "😊", "😇", "🥰", "😍",
+            "🤩", "😘", "😗", "😚", "😙", "🥲", "😋", "😛", "😜", "🤪", "😝", "🤑", "🤗", "🤭", "🫢", "🫣",
+            "🤫", "🤔", "🫡", "🤐", "🤨", "😐", "😑", "😶", "🫥", "😏", "😒", "🙄", "😬", "🤥", "😌", "😔",
+            "😪", "🤤", "😴", "😷", "🤒", "🤕", "🤢", "🤮", "🤧", "🥵", "🥶", "🥴", "😵", "😵‍💫", "🤯", "🤠",
+            "🥳", "🥸", "😎", "🤓", "🧐", "😕", "🫤", "😟", "🙁", "😮", "😯", "😲", "😳", "🥺", "🥹", "😦",
+            "😧", "😨", "😰", "😥", "😢", "😭", "😱", "😖", "😣", "😞", "😓", "😩", "😫", "🥱", "😤", "😡",
+            "😠", "🤬", "😈", "👿", "💀", "☠️", "💩", "🤡", "👹", "👺", "👻", "👽", "👾", "🤖",
+            // Hands (30)
+            "👍", "👎", "👊", "👏", "🙌", "👐", "🤲", "🤝", "🙏", "✍️", "💅", "🤳", "💪", "🖕", "✌️", "🤞",
+            "🫰", "🤟", "🤘", "👌", "🤌", "🤏", "👈", "👉", "👆", "👇", "☝️", "✋", "🖖", "👋",
+            // Hearts (21)
+            "❤️", "🧡", "💛", "💚", "💙", "💜", "🖤", "🤍", "🤎", "💔", "❤️‍🔥", "❤️‍🩹", "💕", "💞", "💓", "💗",
+            "💖", "💘", "💝", "💟", "❣️",
+            // Weather (8)
+            "☀️", "⛅", "☁️", "🌧️", "⛈️", "⚡", "❄️", "🌈",
+            // Symbols (18)
+            "⭐", "🔥", "💯", "⚠️", "✅", "❌", "💤", "🎉", "❗", "❓", "💥", "🔔", "🚫", "✨", "🎶", "🆘",
+            "🔊", "🏆",
+            // Transport (9)
+            "🚗", "🚙", "🚓", "🚨", "🚕", "🚲", "🏍️", "🚀", "✈️",
+            // Monkeys only, no other animals (4)
+            "🐵", "🙈", "🙉", "🙊");
+
+    // Hidden feature: long-pressing the Emoji chip cycles through these
+    // until Stop is pressed, via the same LiveDataSource loop Data's
+    // Time/Speed sources use.
+    private static final List<String> EASTER_EGG_EMOJIS = Arrays.asList(
+            "😀", "😂", "😍", "😜", "😎", "😈", "🤌",
+            "❤️", "💚", "💜", "❤️‍🔥", "🔥", "⚠️", "🚨", "🏍️", "🐵");
 
     BluetoothClient bluetoothClient = new BluetoothClient(this);
     Settings settings;
@@ -87,10 +127,13 @@ public class MainActivity extends AppCompatActivity {
     private TextView nowShowingLabel;
     private Button stopButton;
     private RecyclerView messageGrid;
+    private FloatingActionButton createMessageFab;
     private View emojiPanel;
-    private EditText emojiInput;
     private TextView emojiDurationLabel;
+    private TextView emojiGammaLabel;
+    private EmojiPickerAdapter emojiPickerAdapter;
     private int emojiDurationSeconds;
+    private float emojiGamma;
     private boolean isDisplaying = false;
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private final Runnable connectionPoll = new Runnable() {
@@ -167,36 +210,77 @@ public class MainActivity extends AppCompatActivity {
 
         setUpEmojiPanel();
 
+        createMessageFab = findViewById(R.id.create_message_fab);
+        createMessageFab.setOnClickListener(v -> startActivity(new Intent(this, CreateMessageActivity.class)));
+
         setUpChipGroup(R.id.category_filter, CATEGORY_CHIPS, value -> {
             selectedCategory = value;
             boolean isEmoji = PanelMessage.CATEGORY_EMOJI.equals(value);
             emojiPanel.setVisibility(isEmoji ? View.VISIBLE : View.GONE);
             messageGrid.setVisibility(isEmoji ? View.GONE : View.VISIBLE);
+            // Doesn't apply to Emoji (nothing to save there), and it would
+            // otherwise float on top of the duration/gamma controls.
+            createMessageFab.setVisibility(isEmoji ? View.GONE : View.VISIBLE);
             if (!isEmoji) {
                 refreshMessageList();
             }
         });
 
-        FloatingActionButton fab = findViewById(R.id.create_message_fab);
-        fab.setOnClickListener(v -> startActivity(new Intent(this, CreateMessageActivity.class)));
+        // Hidden feature: long-pressing the Emoji chip (rather than just
+        // tapping it) starts the cycling easter egg instead of switching
+        // categories - returning true from the long-click listener consumes
+        // the gesture so the chip doesn't also toggle checked/selected.
+        ChipGroup categoryChipGroup = findViewById(R.id.category_filter);
+        for (int i = 0; i < categoryChipGroup.getChildCount(); i++) {
+            View child = categoryChipGroup.getChildAt(i);
+            if (child instanceof Chip && "Emoji".contentEquals(((Chip) child).getText())) {
+                child.setOnLongClickListener(v -> {
+                    startEasterEgg();
+                    return true;
+                });
+            }
+        }
+    }
+
+    private void startEasterEgg() {
+        EasterEggDataSource dataSource = new EasterEggDataSource(EASTER_EGG_EMOJIS, emojiGamma);
+        PanelMessage message = new PanelMessage("easter-egg", "Easter Egg", PanelMessage.CATEGORY_EMOJI, PanelMessage.LANGUAGE_NONE,
+                new Frame(dataSource.renderFrame(), 0), true, dataSource);
+        sendMessage(message);
     }
 
     private void setUpEmojiPanel() {
         emojiPanel = findViewById(R.id.emoji_panel);
-        emojiInput = findViewById(R.id.emoji_input);
         emojiDurationLabel = findViewById(R.id.emoji_duration_label);
+        emojiGammaLabel = findViewById(R.id.emoji_gamma_label);
 
         emojiDurationSeconds = settings.getEmojiDurationSeconds();
         emojiDurationLabel.setText(emojiDurationSeconds + "s");
+        emojiGamma = settings.getEmojiGamma();
+        emojiGammaLabel.setText(formatMultiplier(emojiGamma));
 
         findViewById(R.id.emoji_duration_minus).setOnClickListener(v -> adjustEmojiDuration(-1));
         findViewById(R.id.emoji_duration_plus).setOnClickListener(v -> adjustEmojiDuration(1));
+        findViewById(R.id.emoji_gamma_minus).setOnClickListener(v -> adjustEmojiGamma(-EMOJI_GAMMA_STEP));
+        findViewById(R.id.emoji_gamma_plus).setOnClickListener(v -> adjustEmojiGamma(EMOJI_GAMMA_STEP));
 
-        // A tap on the emoji keyboard key inserts one grapheme (possibly
-        // several UTF-16 chars for a ZWJ sequence/skin-tone modifier) in one
-        // shot, so send as soon as anything appears, then clear the field so
-        // the box is ready for the next pick rather than accumulating text.
-        emojiInput.addTextChangedListener(new TextWatcher() {
+        // The grid always previews at normal (1.0) gamma regardless of the
+        // adjustable setting below - only the actual send to the panel uses
+        // emojiGamma. The picker is meant to show what the emoji IS, not a
+        // live preview of the panel adjustment.
+        RecyclerView emojiGrid = findViewById(R.id.emoji_grid);
+        emojiGrid.setLayoutManager(new GridLayoutManager(this, 5));
+        emojiPickerAdapter = new EmojiPickerAdapter(EMOJIS, this::sendEmoji);
+        emojiGrid.setAdapter(emojiPickerAdapter);
+
+        // Covers anything not in the curated grid above: tapping this box
+        // just brings up the keyboard's own emoji picker. A tap there
+        // inserts one grapheme (possibly several UTF-16 chars for a ZWJ
+        // sequence/skin-tone modifier) in one shot, so send as soon as
+        // anything appears, then clear the field so it's ready for the next
+        // pick rather than accumulating text.
+        EditText emojiKeyboardInput = findViewById(R.id.emoji_keyboard_input);
+        emojiKeyboardInput.addTextChangedListener(new TextWatcher() {
             @Override
             public void beforeTextChanged(CharSequence s, int start, int count, int after) {
             }
@@ -212,7 +296,7 @@ public class MainActivity extends AppCompatActivity {
                     return;
                 }
                 sendEmoji(emoji);
-                emojiInput.setText("");
+                emojiKeyboardInput.setText("");
             }
         });
     }
@@ -224,8 +308,19 @@ public class MainActivity extends AppCompatActivity {
         emojiDurationLabel.setText(emojiDurationSeconds + "s");
     }
 
+    private void adjustEmojiGamma(float delta) {
+        emojiGamma = Math.max(Settings.MIN_EMOJI_GAMMA,
+                Math.min(Settings.MAX_EMOJI_GAMMA, emojiGamma + delta));
+        settings.setEmojiGamma(emojiGamma);
+        emojiGammaLabel.setText(formatMultiplier(emojiGamma));
+    }
+
+    private static String formatMultiplier(float value) {
+        return String.format(java.util.Locale.US, "%.2fx", value);
+    }
+
     private void sendEmoji(String emoji) {
-        byte[] ppm = EmojiRenderer.render(emoji);
+        byte[] ppm = EmojiRenderer.render(emoji, emojiGamma);
         PanelMessage message = new PanelMessage("emoji-adhoc", emoji, PanelMessage.CATEGORY_EMOJI, PanelMessage.LANGUAGE_NONE,
                 new Frame(ppm, emojiDurationSeconds * 1000), true, null);
         sendMessage(message);
