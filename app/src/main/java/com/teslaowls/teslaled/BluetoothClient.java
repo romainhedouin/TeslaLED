@@ -10,7 +10,9 @@ import android.content.pm.PackageManager;
 import androidx.core.app.ActivityCompat;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.OutputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -20,6 +22,26 @@ public class BluetoothClient {
     public static final int COMMAND_KILL = 2;
     public static final int COMMAND_SET_BRIGHTNESS = 3;
     private static final int STATUS_OK = 0;
+
+    /** Result of sendCommand() - message is the Pi's own explanation on failure
+     * (what actually went wrong), not a locally-guessed generic reason. */
+    public static final class Result {
+        public final boolean success;
+        public final String message;
+
+        private Result(boolean success, String message) {
+            this.success = success;
+            this.message = message;
+        }
+
+        static Result ok() {
+            return new Result(true, "");
+        }
+
+        static Result failure(String message) {
+            return new Result(false, message);
+        }
+    }
     // BluetoothSocket.connect() has no documented timeout - in poor radio
     // conditions it can block far longer than the ~12s Android typically
     // takes, and every send()/stop() funnels through the single ioHandler
@@ -140,13 +162,17 @@ public class BluetoothClient {
 
     /**
      * Wire format: [1 byte command type][4 bytes big-endian payload length][payload],
-     * then a single-byte status response (0 = OK, anything else = error).
+     * then a response in the same shape, mirrored: [1 byte status][4 bytes
+     * big-endian message length][message, UTF-8]. STATUS_OK's message is
+     * normally empty; a non-OK status carries the Pi's own explanation of
+     * what actually went wrong - callers surface that directly rather than
+     * guessing at a generic failure reason.
      * RFCOMM is a reliable ordered stream (like TCP) so there's no need to
      * hand-chunk the payload or use a sentinel value to mark the end -
      * OutputStream.write(byte[]) already blocks until everything is written,
      * and the length prefix tells the far end exactly how many bytes to read.
      */
-    public boolean sendCommand(int commandType, byte[] payload) {
+    public Result sendCommand(int commandType, byte[] payload) {
         try {
             OutputStream outputStream = this.socket.getOutputStream();
             int length = payload.length;
@@ -163,8 +189,9 @@ public class BluetoothClient {
             }
             outputStream.flush();
 
-            int status = this.socket.getInputStream().read();
-            if (status == -1) {
+            InputStream inputStream = this.socket.getInputStream();
+            byte[] responseHeader = readExact(inputStream, 5);
+            if (responseHeader == null) {
                 // Remote end closed the stream without an IOException on
                 // write() - e.g. the Pi's process restarted after this
                 // socket was established. isConnected() would still report
@@ -172,9 +199,21 @@ public class BluetoothClient {
                 // future send() would keep reusing the same dead socket.
                 System.out.println("[-] Command sending failed: remote closed the connection");
                 discardStaleSocket();
-                return false;
+                return Result.failure("Connection lost");
             }
-            return status == STATUS_OK;
+            int status = responseHeader[0] & 0xFF;
+            int messageLength = ((responseHeader[1] & 0xFF) << 24) | ((responseHeader[2] & 0xFF) << 16)
+                    | ((responseHeader[3] & 0xFF) << 8) | (responseHeader[4] & 0xFF);
+            String message = "";
+            if (messageLength > 0) {
+                byte[] messageBytes = readExact(inputStream, messageLength);
+                if (messageBytes == null) {
+                    discardStaleSocket();
+                    return Result.failure("Connection lost");
+                }
+                message = new String(messageBytes, StandardCharsets.UTF_8);
+            }
+            return status == STATUS_OK ? Result.ok() : Result.failure(message);
         } catch (IOException e) {
             System.out.println("[-] Command sending failed");
             e.printStackTrace();
@@ -185,8 +224,24 @@ public class BluetoothClient {
             // opens a fresh connection instead of repeating the same
             // failing write forever.
             discardStaleSocket();
-            return false;
+            return Result.failure(e.getMessage() != null ? e.getMessage() : "Connection error");
         }
+    }
+
+    /** Reads exactly n bytes, looping since a single read() call isn't
+     * guaranteed to return everything at once. Returns null if the stream
+     * ends before n bytes arrive. */
+    private static byte[] readExact(InputStream in, int n) throws IOException {
+        byte[] buf = new byte[n];
+        int total = 0;
+        while (total < n) {
+            int read = in.read(buf, total, n - total);
+            if (read == -1) {
+                return null;
+            }
+            total += read;
+        }
+        return buf;
     }
 
     private void discardStaleSocket() {

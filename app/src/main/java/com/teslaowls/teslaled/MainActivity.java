@@ -196,10 +196,10 @@ public class MainActivity extends AppCompatActivity {
             }
 
             @Override
-            public void onSendFailed(PanelMessage message) {
+            public void onSendFailed(PanelMessage message, String reason) {
                 isDisplaying = false;
                 updateIdleLabel();
-                Toast.makeText(MainActivity.this, "Failed to send message.", Toast.LENGTH_SHORT).show();
+                Toast.makeText(MainActivity.this, "ERROR: " + reason, Toast.LENGTH_LONG).show();
             }
         });
 

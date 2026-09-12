@@ -32,7 +32,10 @@ public class MessageSender {
 
         void onMessageFinished(PanelMessage message);
 
-        void onSendFailed(PanelMessage message);
+        /** reason is the Pi's own explanation where available (e.g. a rejected
+         * command), or a local one when the failure never reached the Pi at
+         * all (e.g. "Could not connect to panel"). */
+        void onSendFailed(PanelMessage message, String reason);
     }
 
     private final BluetoothClient bluetoothClient;
@@ -80,8 +83,12 @@ public class MessageSender {
         // transport-layer error) discards the socket on failure, so a second
         // attempt goes over a fresh one instead of surfacing a failure that
         // would otherwise clear up on the very next send anyway.
-        if (!connectAndSyncBrightness() && !connectAndSyncBrightness()) {
-            notifyFailed(message);
+        BluetoothClient.Result connectResult = connectAndSyncBrightness();
+        if (!connectResult.success) {
+            connectResult = connectAndSyncBrightness();
+        }
+        if (!connectResult.success) {
+            notifyFailed(message, connectResult.message);
             return;
         }
 
@@ -91,9 +98,9 @@ public class MessageSender {
         }
 
         Frame firstFrame = message.frames.get(0);
-        boolean success = sendCommandWithRetry(BluetoothClient.COMMAND_IMAGE, firstFrame.ppmBytes);
-        if (!success) {
-            notifyFailed(message);
+        BluetoothClient.Result result = sendCommandWithRetry(BluetoothClient.COMMAND_IMAGE, firstFrame.ppmBytes);
+        if (!result.success) {
+            notifyFailed(message, result.message);
             return;
         }
 
@@ -106,9 +113,9 @@ public class MessageSender {
 
     private void doStartLive(PanelMessage message) {
         byte[] firstFrame = message.liveDataSource.renderFrame();
-        boolean success = sendCommandWithRetry(BluetoothClient.COMMAND_IMAGE, firstFrame);
-        if (!success) {
-            notifyFailed(message);
+        BluetoothClient.Result result = sendCommandWithRetry(BluetoothClient.COMMAND_IMAGE, firstFrame);
+        if (!result.success) {
+            notifyFailed(message, result.message);
             return;
         }
 
@@ -130,13 +137,13 @@ public class MessageSender {
         notifyFinished(finished);
     }
 
-    private boolean connectAndSyncBrightness() {
+    private BluetoothClient.Result connectAndSyncBrightness() {
         bluetoothClient.findDevice();
         if (!bluetoothClient.isConnected()) {
             bluetoothClient.connect();
         }
         if (!bluetoothClient.isConnected()) {
-            return false;
+            return BluetoothClient.Result.failure("Could not connect to panel");
         }
         // Cheap enough to send before every message rather than tracking
         // whether the Pi's already up to date - keeps this stateless. Its
@@ -155,12 +162,14 @@ public class MessageSender {
      * discarded the broken socket, so connectAndSyncBrightness() here opens a
      * real new connection rather than reusing the same wedged one.
      */
-    private boolean sendCommandWithRetry(int commandType, byte[] payload) {
-        if (bluetoothClient.sendCommand(commandType, payload)) {
-            return true;
+    private BluetoothClient.Result sendCommandWithRetry(int commandType, byte[] payload) {
+        BluetoothClient.Result result = bluetoothClient.sendCommand(commandType, payload);
+        if (result.success) {
+            return result;
         }
-        if (!connectAndSyncBrightness()) {
-            return false;
+        BluetoothClient.Result reconnect = connectAndSyncBrightness();
+        if (!reconnect.success) {
+            return reconnect;
         }
         return bluetoothClient.sendCommand(commandType, payload);
     }
@@ -178,10 +187,11 @@ public class MessageSender {
         }
 
         Frame frame = message.frames.get(frameIndex);
-        boolean success = sendCommandWithRetry(BluetoothClient.COMMAND_IMAGE, frame.ppmBytes);
-        if (!success) {
+        BluetoothClient.Result result = sendCommandWithRetry(BluetoothClient.COMMAND_IMAGE, frame.ppmBytes);
+        if (!result.success) {
             PanelMessage finished = currentMessage;
             currentMessage = null;
+            notifyFailed(message, result.message);
             notifyFinished(finished);
             return;
         }
@@ -194,10 +204,11 @@ public class MessageSender {
             return;
         }
         byte[] ppm = message.liveDataSource.renderFrame();
-        boolean success = sendCommandWithRetry(BluetoothClient.COMMAND_IMAGE, ppm);
-        if (!success) {
+        BluetoothClient.Result result = sendCommandWithRetry(BluetoothClient.COMMAND_IMAGE, ppm);
+        if (!result.success) {
             PanelMessage finished = currentMessage;
             currentMessage = null;
+            notifyFailed(message, result.message);
             notifyFinished(finished);
             return;
         }
@@ -223,9 +234,9 @@ public class MessageSender {
         }
     }
 
-    private void notifyFailed(PanelMessage message) {
+    private void notifyFailed(PanelMessage message, String reason) {
         if (listener != null) {
-            mainHandler.post(() -> listener.onSendFailed(message));
+            mainHandler.post(() -> listener.onSendFailed(message, reason));
         }
     }
 }
